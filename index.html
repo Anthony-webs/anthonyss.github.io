@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Scanner</title>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body {
+  margin:0;
+  background:#0a0a0f;
+  color:white;
+  font-family:Arial;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+}
+
+#reader {
+  width:300px;
+  border-radius:20px;
+  overflow:hidden;
+  margin-bottom:20px;
+}
+
+.result {
+  padding:20px;
+  border-radius:15px;
+  text-align:center;
+  width:300px;
+}
+
+.ok { background:#00ff8844; }
+.fail { background:#ff004444; }
+
+h1 {
+  margin-bottom:20px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🎟️ SCANNER</h1>
+
+<div id="reader"></div>
+<div id="result" class="result">Čekám na QR...</div>
+
+<script>
+let locked = false;
+
+function extractCode(text){
+  try{
+    const url = new URL(text);
+    return url.searchParams.get("code") || text;
+  }catch(e){
+    return text;
+  }
+}
+
+async function checkCode(raw){
+  if(locked) return;
+  locked = true;
+
+  const code = extractCode(raw).toUpperCase();
+  const box = document.getElementById("result");
+
+  box.className = "result";
+  box.innerHTML = "Kontroluju...";
+
+  try{
+    const res = await fetch("http://anthonyss.borec.cz/scanner_verify.php?code=" + code);
+    const data = await res.json();
+
+    if(data.ok){
+      box.className = "result ok";
+      box.innerHTML = `
+        ✅ OK<br><br>
+        ${data.name}<br>
+        ${data.guests} lidí
+      `;
+    }else{
+      box.className = "result fail";
+      box.innerHTML = "❌ " + data.message;
+    }
+  }catch(e){
+    box.className = "result fail";
+    box.innerHTML = "Chyba spojení";
+  }
+
+  setTimeout(() => locked = false, 2000);
+}
+
+const scanner = new Html5Qrcode("reader");
+
+Html5Qrcode.getCameras().then(cameras => {
+  if(cameras.length){
+    scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      (decoded) => checkCode(decoded)
+    );
+  }
+});
+</script>
+
+</body>
+</html>
